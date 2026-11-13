@@ -1,5 +1,7 @@
-// Онлайн-запись: маршрут, день в календаре, время, число людей. Заявка уходит в WhatsApp готовым сообщением.
-// Расписание задаётся здесь — поменяйте под настоящее.
+// Онлайн-запись: маршрут, день в календаре, время, число людей.
+// Свободное время берётся из расписания (js/api.js → free_slots), заявка сохраняется (create_request)
+// и уходит в WhatsApp готовым сообщением со ссылкой на неё.
+// Если база недоступна, форма работает по старому: время из CONFIG, только WhatsApp.
 const CONFIG = {
   phone: '79640014458',
   daysAhead: 60,                 // на сколько дней вперёд можно записаться
@@ -30,6 +32,42 @@ function init() {
   const state = { month: new Date(today.getFullYear(), today.getMonth(), 1), date: null, time: null, people: 1 };
   const route = () => form.querySelector('input[name=route]:checked');
 
+  // Свободное время из базы: Map 'YYYY-MM-DD' → [{time, spots}] на текущие маршрут, месяц и число людей.
+  // null — ещё грузится. live.on = false — работаем по CONFIG.
+  const live = { on: !!(window.KTApi && window.KTSlots && KTApi.configured()), cache: new Map(), avail: null, key: '' };
+  async function loadAvail() {
+    if (!live.on) return;
+    const m = state.month;
+    const from = m < today ? today : m;
+    const to = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    const key = [route().value, iso(m), state.people].join('|');
+    live.key = key;
+    if (live.cache.has(key)) { live.avail = live.cache.get(key); return redraw(); }
+    live.avail = null; redraw();
+    try {
+      const rows = await KTApi.rpc('free_slots', { p_route: route().value, p_from: iso(from), p_to: iso(to), p_people: state.people });
+      live.cache.set(key, KTSlots.byDay(rows));
+      if (live.key === key) { live.avail = live.cache.get(key); redraw(); }
+    } catch (e) {
+      live.on = false; redraw();     // база не ответила — время из CONFIG
+    }
+  }
+  function redraw() {
+    if (state.date && dayOpen(state.date) === false) { state.date = null; state.time = null; }
+    if (state.date && state.time && !slotList(state.date).some(s => s.time === state.time && s.open)) state.time = null;
+    renderCal(); renderSlots(); summary();
+  }
+  // Время выезда на день: [{time, open, spots}]
+  function slotList(d) {
+    if (live.on) return live.avail ? (live.avail.get(iso(d)) || []).map(s => ({ ...s, open: true })) : [];
+    return CONFIG.slots[route().value].map(t => ({ time: t, open: slotOpen(d, t), spots: null }));
+  }
+  // true / false, или null пока грузится
+  function dayOpen(d) {
+    if (live.on) return live.avail ? live.avail.has(iso(d)) : null;
+    return isOpen(d) && CONFIG.slots[route().value].some(s => slotOpen(d, s));
+  }
+
   function isOpen(d) {
     return d >= today && d <= last && !CONFIG.closedWeekdays.includes(d.getDay()) && !CONFIG.closedDates.includes(iso(d));
   }
@@ -45,6 +83,7 @@ function init() {
     $('#cal-prev').disabled = m <= new Date(today.getFullYear(), today.getMonth(), 1);
     $('#cal-next').disabled = new Date(m.getFullYear(), m.getMonth() + 1, 1) > last;
     const grid = $('#cal-grid');
+    grid.setAttribute('aria-busy', String(live.on && !live.avail));
     const cells = WD.map(w => Object.assign(document.createElement('span'), { className: 'dow', textContent: w, ariaHidden: 'true' }));
     const lead = (m.getDay() + 6) % 7;
     for (let i = 0; i < lead; i++) cells.push(document.createElement('span'));
@@ -54,7 +93,7 @@ function init() {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'day'; b.textContent = n;
       b.setAttribute('aria-label', `${n} ${MONTHS_GEN[d.getMonth()]}, ${WD_FULL[d.getDay()]}`);
-      b.disabled = !isOpen(d) || !CONFIG.slots[route().value].some(s => slotOpen(d, s));
+      b.disabled = dayOpen(d) !== true;
       if (+d === +today) b.classList.add('today');
       b.setAttribute('aria-pressed', String(state.date && +d === +state.date));
       b.addEventListener('click', () => { state.date = d; state.time = null; renderCal(); renderSlots(); summary(); });
@@ -66,20 +105,27 @@ function init() {
   function renderSlots() {
     const box = $('#slots'), hint = $('#slots-hint');
     if (!state.date) { box.replaceChildren(); hint.textContent = 'Сначала выберите день.'; hint.hidden = false; return; }
-    const list = CONFIG.slots[route().value];
+    const list = slotList(state.date);
     box.replaceChildren(...list.map(s => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'slot'; b.textContent = s;
-      b.disabled = !slotOpen(state.date, s);
-      b.setAttribute('aria-pressed', String(state.time === s));
-      b.addEventListener('click', () => { state.time = s; renderSlots(); summary(); });
+      b.type = 'button'; b.className = 'slot'; b.textContent = s.time;
+      if (s.spots != null && s.spots < CONFIG.maxPeople) {
+        const left = Object.assign(document.createElement('small'), { textContent: `осталось мест: ${s.spots}` });
+        b.append(left);
+      }
+      b.disabled = !s.open;
+      b.setAttribute('aria-pressed', String(state.time === s.time));
+      b.addEventListener('click', () => { state.time = s.time; renderSlots(); summary(); });
       return b;
     }));
-    hint.textContent = `Прогулка длится ${route().dataset.dur}. Точное время подтвердим в ответе.`;
+    hint.textContent = list.length ? `Прогулка длится ${route().dataset.dur}. Точное время подтвердим в ответе.`
+      : 'На этот день свободного времени не осталось, выберите другой.';
   }
 
   function people(n) {
+    const was = state.people;
     state.people = Math.min(CONFIG.maxPeople, Math.max(1, n));
+    if (was !== state.people) loadAvail();
     $('#ppl').textContent = state.people;
     $('#ppl-minus').disabled = state.people === 1;
     $('#ppl-plus').disabled = state.people === CONFIG.maxPeople;
@@ -98,11 +144,11 @@ function init() {
 
   form.addEventListener('change', e => {
     if (e.target.name !== 'route') return;
-    if (state.date && !CONFIG.slots[route().value].some(s => slotOpen(state.date, s))) state.date = null;
-    state.time = null; renderCal(); renderSlots(); summary();
+    if (state.date && dayOpen(state.date) === false) state.date = null;
+    state.time = null; renderCal(); renderSlots(); summary(); loadAvail();
   });
-  $('#cal-prev').addEventListener('click', () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1); renderCal(); });
-  $('#cal-next').addEventListener('click', () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); renderCal(); });
+  $('#cal-prev').addEventListener('click', () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1); renderCal(); loadAvail(); });
+  $('#cal-next').addEventListener('click', () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); renderCal(); loadAvail(); });
   $('#ppl-minus').addEventListener('click', () => people(state.people - 1));
   $('#ppl-plus').addEventListener('click', () => people(state.people + 1));
 
@@ -112,8 +158,9 @@ function init() {
     if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
   });
 
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (form.dataset.busy) return;
     const err = $('#form-error');
     const name = form.elements.name.value.trim();
     const phone = form.elements.phone.value.replace(/\D/g, '');
@@ -121,17 +168,42 @@ function init() {
       : !name ? 'Напишите, как к вам обращаться.' : phone.length < 10 ? 'Проверьте номер телефона: в нём должно быть не меньше 10 цифр.' : '';
     if (problem) { err.textContent = problem; err.hidden = false; return; }
     err.hidden = true;
-    const text = [
-      'Здравствуйте! Хочу записаться на конную прогулку.',
-      `Маршрут: ${route().dataset.name}`,
-      `Когда: ${when()}`,
-      `Сколько нас: ${state.people}`,
-      `Опыт: ${form.elements.exp.value}`,
-      `Имя: ${name}`,
-      `Телефон: ${form.elements.phone.value.trim()}`,
-    ].join('\n');
-    window.open(`https://wa.me/${CONFIG.phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    const msg = link => {
+      const fields = { routeName: route().dataset.name, when: when(), people: state.people, exp: form.elements.exp.value, name, phone: form.elements.phone.value.trim(), link };
+      const text = window.KTSlots ? KTSlots.waRequestText(fields) : [
+        'Здравствуйте! Хочу записаться на конную прогулку.', `Маршрут: ${fields.routeName}`, `Когда: ${fields.when}`,
+        `Сколько нас: ${fields.people}`, `Опыт: ${fields.exp}`, `Имя: ${fields.name}`, `Телефон: ${fields.phone}`,
+      ].join('\n');
+      return `https://wa.me/${CONFIG.phone}?text=${encodeURIComponent(text)}`;
+    };
+    if (!live.on) { window.open(msg(), '_blank', 'noopener'); return; }
+
+    // Окно открываем сразу, по нажатию: после ожидания ответа браузер на телефоне его заблокирует.
+    const win = window.open('', '_blank');
+    const go = url => { if (win) { win.opener = null; win.location.href = url; } else location.href = url; };
+    const btn = form.querySelector('[type=submit]');
+    form.dataset.busy = '1'; btn.disabled = true;
+    try {
+      const id = await KTApi.rpc('create_request', {
+        p_route: route().value, p_day: iso(state.date), p_start: state.time, p_people: state.people,
+        p_name: name, p_phone: form.elements.phone.value.trim(), p_experience: form.elements.exp.value,
+        p_hp: form.elements.website ? form.elements.website.value : '',
+      }, { timeout: 6000 });
+      go(msg(new URL('team.html', location.href).href + '#r=' + id));
+      live.cache.clear(); state.time = null; loadAvail();
+    } catch (x) {
+      if (x.code === 'P0001') {          // понятная причина: время заняли, закрыто, проверьте телефон
+        if (win) win.close();
+        err.textContent = x.message.endsWith('.') ? x.message : x.message + '.';
+        err.hidden = false;
+        live.cache.clear(); loadAvail();
+      } else {
+        go(msg());                       // база не ответила — заявка всё равно уйдёт в WhatsApp
+      }
+    } finally {
+      delete form.dataset.busy; btn.disabled = false;
+    }
   });
 
-  renderCal(); renderSlots(); people(1);
+  renderCal(); renderSlots(); people(1); loadAvail();
 }

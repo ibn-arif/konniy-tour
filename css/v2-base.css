@@ -111,3 +111,7 @@ legend { padding: 0; margin-bottom: 12px; font: var(--legend-font, 600 15px var(
   .fields { grid-template-columns: 1fr; }
   .variants { bottom: 8px; left: 8px; }
 }
+
+/* сколько мест осталось на это время */
+.slot small { margin-left: 8px; font-size: 12px; font-weight: 400; opacity: .8; }
+.cal-grid[aria-busy="true"] { opacity: .6; transition: opacity .2s; }

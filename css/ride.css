@@ -270,3 +270,7 @@ legend { font: 700 16px var(--display); margin-bottom: 12px; padding: 0; }
 .variants a { color: #fff; text-decoration: none; padding: 6px 11px; border-radius: 999px; }
 .variants a[aria-current="page"] { background: #fff; color: #111; }
 @media (max-width: 640px) { .variants { bottom: 64px; left: 8px; } }
+
+/* сколько мест осталось на это время */
+.slot small { margin-left: 8px; font-size: 12px; font-weight: 400; opacity: .8; }
+.cal-grid[aria-busy="true"] { opacity: .6; transition: opacity .2s; }

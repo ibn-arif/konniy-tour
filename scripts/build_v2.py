@@ -75,6 +75,7 @@ def book_form(sum_title='Ваша запись'):
         <label class="field"><span>Опыт верховой езды</span><select name="exp"><option>Ни разу не ездил(а)</option><option>Пару раз катался(ась)</option><option>Уверенно езжу</option></select></label>
         <label class="field"><span>Имя</span><input name="name" autocomplete="name" placeholder="Как к вам обращаться"></label>
         <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 9__ ___-__-__"></label>
+        <label class="hp" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">Сайт<input name="website" tabindex="-1" autocomplete="off"></label>
       </div></fieldset>
   </div>
   <aside class="summary" aria-labelledby="sum-title">
@@ -109,6 +110,9 @@ SCRIPTS = f'''<script>
     a.href = 'https://wa.me/{PHONE}?text=' + encodeURIComponent(t);
   }}
 </script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/slots.js"></script>
 <script src="js/booking.js"></script>'''
 
 def variants_nav(cur):
