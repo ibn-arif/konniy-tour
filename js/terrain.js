@@ -654,11 +654,12 @@
     camera.position.copy(camPos); camera.lookAt(camLook);
     // кадрирование: лошадь (в начале — вся тропа) ставим в свободную от табличек часть экрана (box.rideFocus = [x, y], доли экрана).
     // Сдвигаем не камеру, а «окно» объектива — перспектива та же, меняется только место объекта в кадре.
-    if (DRIVE) {
+    // На странице «Маршрут в 3D» тем же способом уводим маршрут из-под панели (box.rideFocus задаёт страница).
+    if (DRIVE || box.rideFocus) {
       const w = box.clientWidth, h = box.clientHeight, f = box.rideFocus || [.5, .5];
       camera.clearViewOffset();
-      const subj = (k > .5 && u < .5 ? frameTmp.copy(center) : frameTmp.copy(horse.position).setY(horse.position.y + 10)).project(camera);
-      const endFade = u > .5 ? 1 - k : 1;
+      const subj = (modeCam !== 'follow' || (k > .5 && u < .5) ? frameTmp.copy(center) : frameTmp.copy(horse.position).setY(horse.position.y + 10)).project(camera);
+      const endFade = DRIVE && u > .5 ? 1 - k : 1;
       if (subj.z < 1) {
         const wx = THREE.MathUtils.clamp(((subj.x + 1) / 2 - f[0]) * w, -.4 * w, .4 * w) * endFade;
         const wy = THREE.MathUtils.clamp(((1 - subj.y) / 2 - f[1]) * h, -.35 * h, .35 * h) * endFade;
@@ -667,7 +668,7 @@
         frame.x += (wx - frame.x) * a; frame.y += (wy - frame.y) * a;
       }
       camera.setViewOffset(w, h, frame.x, frame.y, w, h);
-      applyLight(u);
+      if (DRIVE) applyLight(u);
     }
     camera.updateMatrixWorld();
     frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));

@@ -35,8 +35,18 @@
     color: var(--ink); font: 500 14px var(--text); cursor: pointer; }
   .cam button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .panel .hint { font-size: 13px; color: var(--ink-2); margin-top: 12px; }
-  .credit { position: fixed; right: 12px; bottom: 10px; font-size: 12px; color: #1d2a22; opacity: .75; }
-  @media (max-width: 560px) { .panel { right: var(--gutter); max-width: none; padding: 16px 18px; } .panel h1 { font-size: 26px; } }
+  .credit { position: fixed; right: 12px; bottom: 10px; font-size: 12px; color: #1d2a22; opacity: .75; max-width: 70ch; text-align: right; }
+  /* телефон: компактная панель внизу, маршрут — в свободной верхней части экрана */
+  @media (max-width: 640px) {
+    .panel { top: auto; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: none; padding: 14px 16px 16px; border-radius: 18px; }
+    .panel h1 { font-size: 20px; margin: 4px 0 8px; }
+    .panel dl { grid-template-columns: repeat(3, auto); grid-auto-flow: column; grid-template-rows: auto auto; gap: 0 18px; justify-content: start; margin-bottom: 12px; font-size: 14px; }
+    .panel dt { font-size: 12px; }
+    .panel .hint { display: none; }
+    .cam button { min-height: 40px; flex: 1; }
+    .credit { top: calc(8px + env(safe-area-inset-top)); bottom: auto; left: 10px; right: 10px; font-size: 10px; line-height: 1.35; text-align: left;
+      background: color-mix(in srgb, var(--paper) 80%, transparent); padding: 4px 8px; border-radius: 8px; opacity: .9; }
+  }
 </style>
 </head>
 <body>
@@ -67,6 +77,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script>
+  // где на экране свободно от панели — туда 3D-сцена ставит маршрут и лошадь
+  (function () {
+    const map = document.querySelector('.map'), panel = document.querySelector('.panel'), credit = document.querySelector('.credit');
+    function focus() {
+      const W = innerWidth, H = innerHeight, p = panel.getBoundingClientRect();
+      if (W - p.right > W * .3) map.rideFocus = [(p.right + W) / 2 / W, .5];
+      else { const top = Math.max(0, credit.getBoundingClientRect().bottom); map.rideFocus = [.5, (top + p.top) / 2 / H]; }
+    }
+    addEventListener('resize', focus); focus();
+  })();
+</script>
 <script src="js/terrain.js"></script>
 </body>
 </html>
