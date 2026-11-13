@@ -1,0 +1,14 @@
+{
+  "name": "Konniy Tour — расписание",
+  "short_name": "Расписание",
+  "start_url": "team.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#DCE3D8",
+  "theme_color": "#DCE3D8",
+  "lang": "ru",
+  "icons": [
+    { "src": "media/team-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "media/team-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
