@@ -15,3 +15,5 @@ c.html
 js/scene.js
 css/site.css
 .superpowers/
+.mcp.json
+supabase/.temp/

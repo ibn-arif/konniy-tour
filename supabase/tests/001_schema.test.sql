@@ -1,0 +1,25 @@
+-- Run: send the whole file to execute_sql (or psql). Every line of the output must start with "ok".
+begin;
+set local search_path = public, extensions;
+create temp table _r(id serial, t text) on commit drop;
+grant all on _r to anon; grant all on sequence _r_id_seq to anon;
+insert into _r(t) select plan(14);
+insert into _r(t) select has_table('instructors');
+insert into _r(t) select has_table('horses');
+insert into _r(t) select has_table('routes');
+insert into _r(t) select has_table('instructor_days_off');
+insert into _r(t) select has_table('horse_rest_days');
+insert into _r(t) select has_table('requests');
+insert into _r(t) select has_table('request_instructors');
+insert into _r(t) select has_table('access_keys');
+insert into _r(t) select is((select count(*)::int from routes), 3, 'three routes');
+insert into _r(t) select is((select array_agg(duration_min order by duration_min) from routes), array[60,120,420], 'durations');
+insert into _r(t) select is((select count(*)::int from instructors where name like 'Инструктор _'), 4, 'four instructors');
+insert into _r(t) select is((select count(*)::int from horses where name like 'Лошадь %'), 10, 'ten horses');
+set local role anon;
+insert into _r(t) select throws_ok('select * from public.requests', '42501');
+insert into _r(t) select throws_ok('select * from public.access_keys', '42501');
+reset role;
+insert into _r(t) select * from finish();
+select string_agg(t, E'\n' order by id) as tap from _r;
+rollback;
