@@ -21,4 +21,4 @@
 Выполнить файл целиком через `execute_sql` или SQL Editor. Тест прошёл, если каждая строка
 вывода (кроме `1..N`) начинается с `ok`.
 
-JS-тесты: `node --test tests/`.
+JS-тесты: `node --test tests/*.test.mjs`.
