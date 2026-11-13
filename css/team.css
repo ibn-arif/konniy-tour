@@ -70,11 +70,12 @@ main:focus { outline: none; }
 
 /* новые заявки */
 .reqs, .rides { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.req { width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: center; text-align: left;
+.req { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; text-align: left;
   min-height: 56px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--pending-line); background: var(--pending);
   font: 400 15px/1.35 var(--text); color: var(--ink); cursor: pointer; }
-.req-when { grid-row: span 2; font: 700 15px var(--display); white-space: nowrap; }
-.req-tag { font-size: 13px; color: var(--ink-2); }
+.req-when { font: 700 14px var(--display); }
+.req-what { grid-column: 1 / -1; grid-row: 2; }
+.req-tag { grid-column: 2; grid-row: 1; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 
 /* день */
 .daybar { display: grid; gap: 10px; }
