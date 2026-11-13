@@ -1,6 +1,7 @@
 -- Run: send the whole file to execute_sql (or psql). Every line of the output must start with "ok".
 begin;
 set local search_path = public, extensions;
+set local timezone = 'Europe/Moscow';
 create temp table _r(id serial, t text) on commit drop;
 grant all on _r to anon; grant all on sequence _r_id_seq to anon;
 insert into _r(t) select plan(14);

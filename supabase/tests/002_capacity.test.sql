@@ -1,6 +1,7 @@
 -- slot_capacity: day 2030-06-01, nothing else booked that day.
 begin;
 set local search_path = public, extensions;
+set local timezone = 'Europe/Moscow';
 create temp table _r(id serial, t text) on commit drop;
 create temp table _ids(k text primary key, id uuid) on commit drop;
 insert into _r(t) select plan(8);
