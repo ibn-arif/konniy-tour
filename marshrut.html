@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Маршрут к смотровой в 3D — Конный тур</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/ride.css">
+<style>
+  :root { --bg: var(--paper); --line: var(--ink-line); }
+  html, body { height: 100%; }
+  body { overflow: hidden; }
+  .map { position: fixed; inset: 0; cursor: grab; touch-action: none; }
+  .map:active { cursor: grabbing; }
+  .map canvas { display: block; width: 100%; height: 100%; }
+  .map-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .map.is-video canvas, .map.is-video .map-label { display: none; }
+  .map.is-video { cursor: default; }
+  /* в видео камерой не управляют и «Сейчас» не обновляется */
+  .map-is-video .cam, .map-is-video .now-row { display: none; }
+  .map-label { position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap; font-size: 13px; font-weight: 600;
+    color: var(--bg); background: var(--ink); padding: 5px 10px; border-radius: 999px; transition: opacity .2s; }
+  .panel { position: fixed; left: var(--gutter); top: var(--gutter); max-width: 360px; padding: 22px 24px; border-radius: 20px;
+    background: var(--paper); border: 2px solid var(--ink-line); box-shadow: var(--lift); }
+  .panel a.back { font-size: 14px; color: var(--ink-2); text-decoration: none; }
+  .panel a.back:hover { color: var(--ink); }
+  .panel h1 { font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 14px; }
+  .panel dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0 0 18px; font-size: 15px; }
+  .panel dt { color: var(--ink-2); }
+  .panel dd { margin: 0; }
+  .cam { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cam button { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--ink-line); background: transparent;
+    color: var(--ink); font: 500 14px var(--text); cursor: pointer; }
+  .cam button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .panel .hint { font-size: 13px; color: var(--ink-2); margin-top: 12px; }
+  .credit { position: fixed; right: 12px; bottom: 10px; font-size: 12px; color: #1d2a22; opacity: .75; }
+  @media (max-width: 560px) { .panel { right: var(--gutter); max-width: none; padding: 16px 18px; } .panel h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<div class="map" data-terrain="data/" data-model="models/horse-web.glb" aria-label="Трёхмерная карта маршрута" role="img">
+  <!-- запасной вариант для слабых устройств: тот же маршрут, записанный заранее -->
+  <video class="map-video" muted loop playsinline preload="none" poster="media/marshrut-poster.jpg" hidden>
+    <source src="media/marshrut.mp4" type="video/mp4">
+  </video>
+</div>
+
+<aside class="panel">
+  <a class="back" href="index.html">← К сайту</a>
+  <h1 id="route-name">Маршрут</h1>
+  <dl>
+    <dt>Длина</dt><dd id="route-len">—</dd>
+    <dt>Высота</dt><dd id="route-climb">—</dd>
+    <dt class="now-row">Сейчас</dt><dd class="now-row" id="route-now" aria-live="off">—</dd>
+  </dl>
+  <div class="cam" role="group" aria-label="Камера">
+    <button type="button" data-cam="follow">За лошадью</button>
+    <button type="button" data-cam="overview">Весь маршрут</button>
+  </div>
+  <p class="hint">Маршрут конной прогулки от конюшни к смотровой площадке.</p>
+</aside>
+
+<p class="credit">Рельеф: Mapzen Terrain Tiles, AWS Open Data. Дома и улицы: © <a href="https://www.openstreetmap.org/copyright">участники OpenStreetMap</a> (ODbL). Леса по снимку Sentinel-2 cloudless 2017 <a href="https://s2maps.eu">EOX</a> (CC BY 4.0). Модель лошади: «Horse», <a href="https://sketchfab.com/3d-models/horse-a6f860e43e364619bccb174a1ac7d0c9">henrysteve973</a>, CC BY 4.0</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="js/terrain.js"></script>
+</body>
+</html>

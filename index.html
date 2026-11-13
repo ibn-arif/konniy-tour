@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Конные прогулки над Махачкалой — Konniy Tour</title>
+<meta name="description" content="Конные прогулки в горах над Махачкалой: от часа до семи часов в седле, инструктор рядом, опыт не нужен. Запись онлайн в WhatsApp.">
+<meta name="theme-color" content="#DCE3D8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/ride.css">
+<link rel="preload" href="data/terrain.bin" as="fetch" crossorigin>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="wa" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.4-.2Z"/></symbol>
+  <symbol id="horse" viewBox="0 0 40 40"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M12 34c1-6 3-10 7-12-3 0-6-1-7-4l9-8c4-3 9-2 11 2 1 2 0 5-2 6l-2 1c1 3 0 7-3 9M24 9l1-4M20 11l-1-4M28 13h.01"/></symbol>
+</svg>
+
+<!-- 3D-мир за страницей: прокрутка ведёт лошадь по настоящей тропе от конюшни к смотровой -->
+<div class="world" data-terrain="data/" data-model="models/horse-web.glb" data-drive="scroll" aria-hidden="true">
+  <video class="map-video" muted loop playsinline preload="none" poster="media/marshrut-poster.jpg" hidden>
+    <source src="media/marshrut.mp4" type="video/mp4">
+  </video>
+</div>
+
+<header class="top">
+  <a class="brand" href="#top" aria-label="Konniy Tour, в начало">
+    <svg aria-hidden="true"><use href="#horse"/></svg>
+    <span><b>Konniy Tour</b><small>Конные прогулки, Махачкала</small></span>
+  </a>
+  <nav class="nav" aria-label="Разделы">
+    <a href="#routes">Маршруты</a>
+    <a href="#faq">Впервые в седле</a>
+    <a href="#pass">Абонемент</a>
+    <a href="#where">Как добраться</a>
+  </nav>
+  <a class="btn btn-main btn-sm" href="#book">Записаться</a>
+</header>
+
+<!-- высотный профиль тропы: точка — где сейчас лошадь -->
+<div class="alt" aria-hidden="true">
+  <div class="alt-plot"><svg class="alt-svg" viewBox="0 0 240 56" preserveAspectRatio="none"><clipPath id="alt-clip"><rect x="0" y="0" width="0" height="56"/></clipPath><path class="alt-area"/><path class="alt-line"/><path class="alt-done" clip-path="url(#alt-clip)"/></svg><span class="alt-dot"></span></div>
+  <p class="alt-read"><b class="alt-km">0,0 км</b><span class="alt-m">127 м</span></p>
+</div>
+
+<main id="top">
+  <section class="stop hero" data-at="0" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <h1 id="hero-title">Конные прогулки над&nbsp;Махачкалой</h1>
+      <p class="lead">От часа до семи часов в седле. Инструктор рядом весь маршрут, опыт не нужен.</p>
+    </div>
+    <form class="sign hero-pick" id="quick" aria-label="Быстрая запись">
+      <fieldset>
+        <legend>Куда поедем?</legend>
+        <div class="pick">
+          <label><input type="radio" name="q" value="short" checked><b>На смотровую</b><small>45–60 мин, для первого раза</small></label>
+          <label><input type="radio" name="q" value="trails"><b>По тропам</b><small>1,5–2 часа, для начинающих</small></label>
+          <label><input type="radio" name="q" value="long"><b>Дальний в горы</b><small>до 7 часов, с опытом</small></label>
+        </div>
+      </fieldset>
+      <div class="row">
+        <button class="btn btn-main" type="submit">Выбрать день и время</button>
+        <a class="btn btn-line js-wa" href="https://wa.me/79640014458"><svg aria-hidden="true"><use href="#wa"/></svg>Написать</a>
+      </div>
+    </form>
+    <p class="scroll-cue">Прокрутите — и поедем по тропе к смотровой</p>
+  </section>
+
+  <section class="stop" data-at=".14" aria-labelledby="start-title">
+    <article class="sign">
+      <p class="stake" data-stake>Конюшня</p>
+      <h2 id="start-title">Старт у конюшни</h2>
+      <ol class="steps">
+        <li><b>Выбираете время</b> онлайн или пишете в WhatsApp: сколько вас и ездили ли раньше.</li>
+        <li><b>Мы подтверждаем</b> или предлагаем соседнее время, если подведёт погода.</li>
+        <li><b>Инструктор подбирает лошадь</b>, помогает сесть в седло и едет рядом всю дорогу.</li>
+      </ol>
+      <figure class="photo" data-photo="guest-stable"><span>Фото из Instagram: гостья с лошадью на конюшне</span></figure>
+    </article>
+  </section>
+
+  <section class="stop" id="routes" data-at=".32" aria-labelledby="routes-title">
+    <div class="sign sign-wide right">
+      <p class="stake" data-stake>Развилка</p>
+      <h2 id="routes-title">Три маршрута под ваш опыт</h2>
+      <div class="boards">
+        <article class="board">
+          <h3>На смотровую</h3>
+          <p class="who">Для первого раза</p>
+          <p>Короткий подъём к видовой площадке над городом. Шагом, без спешки: хватит, чтобы привыкнуть к лошади и сделать фото.</p>
+          <dl class="facts"><div><dt>Путь</dt><dd>3,5 км</dd></div><div><dt>Время</dt><dd>45–60 мин</dd></div><div><dt>Цена</dt><dd class="todo">… ₽</dd></div></dl>
+          <a class="btn btn-line" data-pick="short" href="#book">Записаться</a>
+        </article>
+        <article class="board">
+          <h3>По живописным тропам</h3>
+          <p class="who">Для начинающих</p>
+          <p>Неспешная прогулка по лесу и склонам с видами. Для тех, кто хочет побыть в седле подольше, но без галопа.</p>
+          <dl class="facts"><div><dt>Путь</dt><dd>7 км</dd></div><div><dt>Время</dt><dd>1,5–2 часа</dd></div><div><dt>Цена</dt><dd class="todo">… ₽</dd></div></dl>
+          <a class="btn btn-line" data-pick="trails" href="#book">Записаться</a>
+        </article>
+        <article class="board">
+          <h3>Дальний маршрут в горы</h3>
+          <p class="who">Для уверенных всадников</p>
+          <p>Целый день в седле: рысь и галоп там, где позволяет тропа, привал и панорамы, до которых не доехать на машине.</p>
+          <dl class="facts"><div><dt>Путь</dt><dd class="todo">… км</dd></div><div><dt>Время</dt><dd>до 7 часов</dd></div><div><dt>Цена</dt><dd class="todo">… ₽</dd></div></dl>
+          <a class="btn btn-line" data-pick="long" href="#book">Записаться</a>
+        </article>
+      </div>
+      <p class="more"><a href="marshrut.html">Покрутить тропу к смотровой в 3D</a></p>
+    </div>
+  </section>
+
+  <section class="stop" id="faq" data-at=".5" aria-labelledby="faq-title">
+    <div class="sign">
+      <p class="stake" data-stake>Лес</p>
+      <h2 id="faq-title">Впервые в седле</h2>
+      <div class="faq">
+        <details open><summary>Я ни разу не сидел на лошади. Мне можно?</summary>
+          <p>Да. Для первого раза есть спокойные маршруты шагом. Перед выездом инструктор покажет, как сидеть и управлять лошадью, и будет рядом всю дорогу.</p></details>
+        <details><summary>Во что одеться?</summary>
+          <p>Удобные штаны, закрытая обувь на небольшом каблуке или кроссовки, ветровка: в горах прохладнее, чем в городе. Длинная юбка тоже подойдёт. <span class="todo">Шлемы выдаём?</span></p></details>
+        <details><summary>Есть ли ограничения по возрасту и весу?</summary>
+          <p>Дети — с <span class="todo">… лет</span>, вес всадника — до <span class="todo">… кг</span>. Если сомневаетесь, напишите нам, подскажем.</p></details>
+        <details><summary>Можно приехать компанией или с детьми?</summary>
+          <p>Да, собираем группы. <span class="todo">Сколько человек за раз?</span> Детей ведёт инструктор в поводу.</p></details>
+        <details><summary>А если пойдёт дождь?</summary>
+          <p>Предупредим заранее и перенесём прогулку на другой день.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="stop" data-at=".68" aria-labelledby="people-title">
+    <div class="sign sign-wide right">
+      <p class="stake" data-stake>Поляна</p>
+      <h2 id="people-title">Кто уже съездил</h2>
+      <div class="gallery">
+        <figure class="photo tall" data-photo="viewpoint-group"><span>Фото из Instagram: группа на смотровой</span></figure>
+        <figure class="photo" data-photo="instructor"><span>Фото из Instagram: инструктор с лошадью</span></figure>
+        <figure class="photo" data-photo="trail-back"><span>Фото из Instagram: всадница на тропе</span></figure>
+      </div>
+      <div class="quotes">
+        <blockquote><p class="todo">Отзыв гостя из Instagram</p><cite>Имя, когда ездили</cite></blockquote>
+        <blockquote><p class="todo">Отзыв гостя из Instagram</p><cite>Имя, когда ездили</cite></blockquote>
+      </div>
+      <p class="more"><a href="https://www.instagram.com/konniy.tour.dagestan/">Больше фото и видео в Instagram</a></p>
+    </div>
+  </section>
+
+  <section class="stop" id="pass" data-at=".84" aria-labelledby="pass-title">
+    <div class="sign pass">
+      <p class="stake" data-stake>Последний подъём</p>
+      <h2 id="pass-title">Абонемент: платите 10&nbsp;000&nbsp;₽, катаетесь на 15&nbsp;000&nbsp;₽</h2>
+      <ul>
+        <li>Любые маршруты на общую сумму 15 000 ₽.</li>
+        <li>Можно ездить одному или делить с друзьями (<span class="todo">уточнить условия</span>).</li>
+        <li>Хороший подарок тому, кто давно хотел на лошадь.</li>
+      </ul>
+      <a class="btn btn-main js-wa" data-route="Абонемент" href="https://wa.me/79640014458"><svg aria-hidden="true"><use href="#wa"/></svg>Купить абонемент</a>
+    </div>
+  </section>
+
+  <section class="stop finale" id="book" data-at="1" aria-labelledby="book-title">
+    <div class="sign sign-book">
+      <p class="stake" data-stake>Смотровая</p>
+      <h2 id="book-title">Вы на смотровой. Осталось выбрать день</h2>
+      <p class="sub">Заявка уйдёт нам в WhatsApp, мы подтвердим её в течение <span class="todo">… часа</span>.</p>
+      <form class="book-grid" id="book-form" novalidate>
+        <div class="book-steps">
+          <fieldset>
+            <legend>Маршрут</legend>
+            <div class="pick">
+              <label><input type="radio" name="route" value="short" data-name="На смотровую" data-dur="45–60 мин" checked><b>На смотровую</b><small>3,5 км, 45–60 мин</small></label>
+              <label><input type="radio" name="route" value="trails" data-name="По живописным тропам" data-dur="1,5–2 часа"><b>По тропам</b><small>7 км, 1,5–2 часа</small></label>
+              <label><input type="radio" name="route" value="long" data-name="Дальний маршрут в горы" data-dur="до 7 часов"><b>Дальний</b><small>до 7 часов, с опытом</small></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>День</legend>
+            <div class="cal">
+              <div class="cal-top">
+                <strong id="cal-title" aria-live="polite"></strong>
+                <div class="cal-nav">
+                  <button type="button" class="icon-btn" id="cal-prev" aria-label="Предыдущий месяц"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
+                  <button type="button" class="icon-btn" id="cal-next" aria-label="Следующий месяц"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
+                </div>
+              </div>
+              <div class="cal-grid" id="cal-grid"></div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Время выезда</legend>
+            <div class="slots" id="slots"></div>
+            <p class="hint" id="slots-hint">Сначала выберите день.</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>О вас</legend>
+            <div class="fields">
+              <div class="field"><span>Сколько человек</span>
+                <div class="stepper">
+                  <button type="button" class="icon-btn" id="ppl-minus" aria-label="Меньше человек"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
+                  <output id="ppl" aria-live="polite">1</output>
+                  <button type="button" class="icon-btn" id="ppl-plus" aria-label="Больше человек"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10"/></svg></button>
+                </div>
+              </div>
+              <label class="field"><span>Опыт верховой езды</span>
+                <select name="exp"><option>Ни разу не ездил(а)</option><option>Пару раз катался(ась)</option><option>Уверенно езжу</option></select>
+              </label>
+              <label class="field"><span>Имя</span><input name="name" autocomplete="name" placeholder="Как к вам обращаться"></label>
+              <label class="field"><span>Телефон</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 9__ ___-__-__"></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <aside class="summary" aria-labelledby="sum-title">
+          <h3 id="sum-title">Ваша запись</h3>
+          <dl>
+            <div><dt>Маршрут</dt><dd id="s-route"></dd></div>
+            <div><dt>Когда</dt><dd id="s-when" class="empty">Выберите день и время</dd></div>
+            <div><dt>Сколько вас</dt><dd id="s-ppl"></dd></div>
+          </dl>
+          <p class="form-error" id="form-error" role="alert" hidden></p>
+          <button class="btn btn-main" type="submit"><svg aria-hidden="true"><use href="#wa"/></svg>Отправить заявку в WhatsApp</button>
+          <p class="note">Откроется WhatsApp с готовым сообщением, останется нажать «Отправить». Не пользуетесь WhatsApp? Позвоните: <a href="tel:+79640014458">+7 964 001-44-58</a>.</p>
+        </aside>
+      </form>
+    </div>
+  </section>
+
+  <section class="stop where" id="where" aria-labelledby="where-title">
+    <div class="sign">
+      <h2 id="where-title">Как добраться</h2>
+      <dl class="facts-list">
+        <div><dt>Адрес конюшни</dt><dd class="todo">улица, ориентир</dd></div>
+        <div><dt>От центра Махачкалы</dt><dd><span class="todo">… минут</span> на машине или такси</dd></div>
+        <div><dt>Часы работы</dt><dd class="todo">каждый день, с … до …</dd></div>
+        <div><dt>Телефон и WhatsApp</dt><dd><a href="tel:+79640014458">+7 964 001-44-58</a></dd></div>
+      </dl>
+      <div class="map-slot">Здесь будет карта: Яндекс Карты или 2ГИС с точкой конюшни</div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p><b>Konniy Tour</b>: конные прогулки, Махачкала, Дагестан. <a href="https://www.instagram.com/konniy.tour.dagestan/">Instagram @konniy.tour.dagestan</a></p>
+  <p class="credit">3D: рельеф Mapzen Terrain Tiles, AWS Open Data; дома и улицы © <a href="https://www.openstreetmap.org/copyright">участники OpenStreetMap</a> (ODbL); леса по снимку Sentinel-2 cloudless 2017 <a href="https://s2maps.eu">EOX</a> (CC BY 4.0); модель лошади «Horse», <a href="https://sketchfab.com/3d-models/horse-a6f860e43e364619bccb174a1ac7d0c9">henrysteve973</a>, CC BY 4.0.</p>
+</footer>
+
+<nav class="variants" aria-label="Варианты дизайна"><a href="index.html" aria-current="page">3D-прогулка</a><a href="v2-masti.html">Масти</a><a href="v2-club.html">Клуб</a><a href="v2-afisha.html">Афиша</a></nav>
+<script src="js/ride.js"></script>
+<script src="js/booking.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="js/terrain.js"></script>
+</body>
+</html>

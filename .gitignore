@@ -1,0 +1,16 @@
+# секреты и черновики
+private/
+.impeccable/
+.DS_Store
+__pycache__/
+# исходники, которые на сайте не нужны
+models/horse/
+data/raw/
+data/raw14/
+data/sat/
+media/insta/*.jpg
+# старые варианты первой итерации
+b.html
+c.html
+js/scene.js
+css/site.css
