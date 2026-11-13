@@ -153,14 +153,16 @@
     const times = [...new Set(day.routes.flatMap(r => r.slots))].sort();
     const cols = [{ id: null, name: 'Ждут', day_off: false }, ...day.instructors];
     const span = r => [mins(r.start_time), mins(r.start_time) + routeDur(r.route_key)];
-    const at = (col, t) => day.requests.filter(r =>
-      col.id ? r.instructors.some(i => i.id === col.id) : r.instructors.length === 0);
+    // В «Ждут» — заявки без инструктора и выезды, чьих инструкторов нет среди столбцов (например, отключили).
+    const listed = new Set(day.instructors.map(i => i.id));
+    const at = col => day.requests.filter(r =>
+      col.id ? r.instructors.some(i => i.id === col.id) : !r.instructors.some(i => listed.has(i.id)));
 
     const head = h('tr', null, h('th', { scope: 'col', class: 'tcol', text: 'Время' }),
       ...cols.map(c => h('th', { scope: 'col', class: c.day_off ? 'off' : null }, c.name, c.day_off ? h('small', { text: 'выходной' }) : null)));
     const rows = times.map(t => h('tr', null, h('th', { scope: 'row', class: 'tcol', text: t }), ...cols.map(c => {
       const td = h('td', { class: c.day_off ? 'off' : null });
-      for (const r of at(c, t)) {
+      for (const r of at(c)) {
         const [s, e] = span(r);
         if (r.start_time === t) {
           td.append(h('button', { type: 'button', class: `cell ${r.status}`, onclick: () => openRequest(r.id) },
@@ -353,10 +355,14 @@
           ? { p_id: p.id, p_name: name.value, p_phone: phone.value, p_active: active.checked }
           : { p_id: p.id, p_name: name.value, p_active: active.checked });
         p.phone = isI ? phone.value.replace(/\D/g, '') : null;
+        p.active = active.checked;
         msg.textContent = 'Сохранено';
         card.classList.toggle('inactive', !active.checked);
         strip.hidden = false; if (link) link.hidden = false;
-      } catch (e) { msg.textContent = errText(e); }
+      } catch (e) {
+        msg.textContent = errText(e);
+        if (p.id && active.checked !== p.active) active.checked = p.active;   // отключить не дали — вернуть галочку
+      }
     }
     name.addEventListener('change', save);
     if (phone) phone.addEventListener('change', save);
