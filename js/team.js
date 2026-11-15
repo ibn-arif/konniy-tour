@@ -78,25 +78,62 @@
     try {
       st.me = await call('team_whoami', {});
     } catch (e) {
-      if (e.code === '42501') return screen('Ссылка больше не работает', 'Попросите новую у главного: он выдаст её в разделе «Команда и лошади».');
+      if (e.code === '42501') return screen('Ссылка больше не работает', 'Попросите новую у главного: он выдаст её в разделе «Команда».');
       return screen('Нет связи', errText(e), h('button', { class: 'btn btn-main', type: 'button', onclick: start, text: 'Попробовать ещё раз' }));
     }
     $('#who').textContent = st.me.role === 'head' ? 'Главный' : (st.me.name || 'Инструктор');
-    const tabs = st.me.role === 'head'
-      ? [['schedule', 'Расписание'], ['team', 'Команда и лошади'], ['history', 'История']]
-      : [['mine', 'Мои выезды'], ['schedule', 'Расписание'], ['record', 'Записать гостя']];
-    tabsNav.replaceChildren(...tabs.map(([k, t]) => h('button', { type: 'button', 'data-tab': k, text: t, onclick: () => go(k) })));
+    const isHead = st.me.role === 'head';
+    const tabs = isHead
+      ? [['requests', 'Заявки'], ['schedule', 'День'], ['history', 'История'], ['team', 'Команда']]
+      : [['mine', 'Мои выезды'], ['schedule', 'День'], ['record', 'Записать']];
+    tabsNav.replaceChildren(...tabs.map(([k, t]) => h('button', { type: 'button', 'data-tab': k, onclick: () => go(k) },
+      tabIcon(ICONS[k]), h('span', { text: t }), k === 'requests' ? h('b', { class: 'badge', hidden: true, 'aria-label': 'новых' }) : null)));
     tabsNav.hidden = false;
-    await go(tabs[0][0]);
+    // Главный попадает сразу к заявкам, если они есть, иначе — в день.
+    const first = isHead ? ((await refreshBadge()) ? 'requests' : 'schedule') : 'mine';
+    await go(first);
     if (st.openId) { const id = st.openId; st.openId = null; openRequest(id); }
+  }
+
+  const TITLES = { requests: 'Заявки', schedule: 'День', history: 'История', team: 'Команда', mine: 'Мои выезды', record: 'Записать гостя' };
+  const ICONS = {
+    requests: 'M3 13h5l2 3h4l2-3h5M5.5 5h13L21 13v6H3v-6z',
+    schedule: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3',
+    history: 'M12 8v4l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 3v4h4',
+    team: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3.3 2.7-5 6-5s6 1.7 6 5M16 5.2a3 3 0 0 1 0 5.6M18 15c1.8.6 3 2.2 3 5',
+    mine: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M9 15l2 2 4-4',
+    record: 'M12 5v14M5 12h14',
+  };
+  function tabIcon(d) {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); s.append(p);
+    return s;
+  }
+  // Число ждущих заявок: на вкладке «Заявки» и на значке приложения.
+  function setPending(n) {
+    const b = tabsNav.querySelector('.badge');
+    if (b) { b.textContent = n > 99 ? '99+' : String(n); b.hidden = !n; }
+    badge(n);
+  }
+  async function refreshBadge() {
+    if (!st.me || st.me.role !== 'head') return 0;
+    try {
+      const list = await call('team_requests', { p_from: today(), p_to: addDays(today(), 60), p_status: 'pending' });
+      setPending(list.length);
+      return list.length;
+    } catch (e) { return 0; }
   }
 
   async function go(tab, arg) {
     st.tab = tab;
     for (const b of tabsNav.children) b.setAttribute('aria-current', String(b.dataset.tab === tab));
+    $('.brand b').textContent = TITLES[tab] || 'Расписание';
+    window.scrollTo(0, 0);
     main.replaceChildren(h('p', { class: 'state', text: 'Загружаем…' }));
     try {
-      if (tab === 'schedule') await viewSchedule();
+      if (tab === 'requests') await viewRequests();
+      else if (tab === 'schedule') await viewSchedule();
       else if (tab === 'team') await viewTeam();
       else if (tab === 'mine') await viewMine();
       else if (tab === 'record') await viewRecord();
@@ -107,17 +144,13 @@
         h('button', { class: 'btn', type: 'button', text: 'Попробовать ещё раз', onclick: () => go(tab) }));
     }
   }
-  const refresh = () => st.tab && go(st.tab);
+  const refresh = () => { if (!st.tab) return; go(st.tab); if (st.tab !== 'requests') refreshBadge(); };
 
   // ---------- расписание дня ----------
   async function viewSchedule() {
     const isHead = st.me.role === 'head';
-    const [day, pend] = await Promise.all([
-      call('team_day', { p_day: st.day }),
-      isHead ? call('team_requests', { p_from: today(), p_to: addDays(today(), 60), p_status: 'pending' }) : Promise.resolve(null),
-    ]);
+    const day = await call('team_day', { p_day: st.day });
     st.routes = day.routes || st.routes;
-    if (pend) { st.pending = pend; badge(pend.length); }
 
     const nav = h('div', { class: 'daynav' },
       h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Предыдущий день', onclick: () => { st.day = addDays(st.day, -1); go('schedule'); } }, arrow('M10 3 5 8l5 5')),
@@ -128,18 +161,36 @@
       h('button', { type: 'button', class: 'chip', 'aria-pressed': String(st.day === addDays(today(), n)), text: t, onclick: () => { st.day = addDays(today(), n); go('schedule'); } })));
 
     const parts = [];
-    if (isHead) {
-      parts.push(h('section', { class: 'card new' },
-        h('h2', { text: pend.length ? `Новые заявки: ${pend.length}` : 'Новых заявок нет' }),
-        pend.length ? h('ul', { class: 'reqs' }, ...pend.map(r => reqRow(r, true))) : h('p', { class: 'muted', text: 'Когда гость или инструктор оставит заявку, она появится здесь.' })));
-    }
     parts.push(h('div', { class: 'daybar' }, nav, quick));
     parts.push(grid(day));
     const free = day.horses.total - day.horses.resting.length;
-    parts.push(h('p', { class: 'horses' }, h('b', { text: `Лошади: свободно ${free} из ${day.horses.total}` }),
+    parts.push(h('p', { class: 'horses' }, h('b', { text: `Лошади: в строю ${free} из ${day.horses.total}` }),
       day.horses.resting.length ? `, отдыхают: ${day.horses.resting.join(', ')}` : ', все в строю'));
     if (!isHead) parts.push(h('p', { class: 'muted', text: 'Подтверждает и переносит выезды главный. Телефоны гостей видны только в ваших выездах.' }));
     main.replaceChildren(...parts);
+  }
+
+  // ---------- заявки (главный) ----------
+  async function viewRequests() {
+    const [pend, soon] = await Promise.all([
+      call('team_requests', { p_from: today(), p_to: addDays(today(), 60), p_status: 'pending' }),
+      call('team_requests', { p_from: today(), p_to: addDays(today(), 2), p_status: 'confirmed' }),
+    ]);
+    if (!st.routes.length) st.routes = (await call('team_day', { p_day: today() })).routes;
+    setPending(pend.length);
+    const byDay = list => { const m = new Map(); for (const r of list) { if (!m.has(r.day)) m.set(r.day, []); m.get(r.day).push(r); } return [...m]; };
+    const dayName = d => d === today() ? 'Сегодня' : d === addDays(today(), 1) ? 'Завтра' : dayLabel(d);
+    const groups = list => byDay(list).map(([d, rs]) => h('div', { class: 'req-day' },
+      h('h3', { text: dayName(d) }), h('ul', { class: 'reqs' }, ...rs.map(r => reqRow(r, false)))));
+    main.replaceChildren(
+      h('section', { class: 'card' },
+        h('h2', { text: pend.length ? `Ждут ответа: ${pend.length}` : 'Новых заявок нет' }),
+        pend.length ? h('p', { class: 'muted', text: 'Нажмите на заявку, чтобы подтвердить, перенести или отклонить.' })
+          : h('p', { class: 'muted', text: 'Когда гость оставит заявку на сайте или инструктор запишет гостя, она появится здесь, а на вкладке загорится число.' }),
+        ...groups(pend)),
+      h('section', { class: 'card' },
+        h('h2', { text: 'Ближайшие выезды' }),
+        soon.length ? groups(soon) : h('p', { class: 'muted', text: 'На сегодня, завтра и послезавтра подтверждённых выездов нет.' })));
   }
 
   function reqRow(r, withDay) {
@@ -393,31 +444,46 @@
   function busy(btn, on) { btn.disabled = on; btn.setAttribute('aria-busy', String(on)); }
 
   // ---------- команда и лошади ----------
+  // «Команда»: инструкторы, лошади, маршруты и своя ссылка — по одному разделу на экране.
+  const TEAM_PARTS = [['instructors', 'Инструкторы'], ['horses', 'Лошади'], ['routes', 'Маршруты'], ['link', 'Ссылка']];
   async function viewTeam() {
     const to = addDays(today(), 29);
     const [data, day] = await Promise.all([call('head_team', { p_from: today(), p_to: to }), call('team_day', { p_day: today() })]);
     st.routes = day.routes;
     const days = Array.from({ length: 30 }, (_, i) => addDays(today(), i));
-    const addRoute = h('button', { type: 'button', class: 'btn btn-quiet add', text: '+ добавить маршрут' });
-    addRoute.addEventListener('click', () => {
-      addRoute.before(routeCard({ key: null, name: '', duration_min: 60, slots: [], dur_label: '', note: '', active: true }, true));
-      addRoute.previousElementSibling.querySelector('input').focus();
-    });
-    main.replaceChildren(
-      h('section', { class: 'card' }, h('h2', { text: 'Инструкторы' }),
-        h('p', { class: 'muted', text: 'Нажмите на день, чтобы отметить выходной. Выходные дни не предлагаются гостям на сайте.' }),
+    st.teamPart = st.teamPart || 'instructors';
+    const body = h('div', { class: 'team-body' });
+    const seg = h('div', { class: 'seg', role: 'tablist', 'aria-label': 'Разделы команды' }, ...TEAM_PARTS.map(([k, t]) =>
+      h('button', { type: 'button', role: 'tab', 'data-part': k, text: t, onclick: () => { st.teamPart = k; show(); } })));
+    function show() {
+      for (const b of seg.children) b.setAttribute('aria-selected', String(b.dataset.part === st.teamPart));
+      body.replaceChildren(part(st.teamPart));
+    }
+    function part(k) {
+      if (k === 'instructors') return h('section', { class: 'card' }, h('h2', { text: 'Инструкторы' }),
+        h('p', { class: 'muted', text: 'Нажмите на день в полоске, чтобы отметить выходной. Здесь же выдаются личные ссылки.' }),
         ...data.instructors.map(i => personCard(i, 'instructor', days)),
-        addButton('+ добавить инструктора', 'instructor', days)),
-      h('section', { class: 'card' }, h('h2', { text: 'Лошади' }),
-        h('p', { class: 'muted', text: 'Отмеченные дни — отдых. Лошадь «не работает» не считается совсем.' }),
+        addButton('+ добавить инструктора', 'instructor', days));
+      if (k === 'horses') return h('section', { class: 'card' }, h('h2', { text: 'Лошади' }),
+        h('p', { class: 'muted', text: 'Отмеченные дни — отдых. Лошадь «не в строю» не считается совсем.' }),
         ...data.horses.map(x => personCard(x, 'horse', days)),
-        addButton('+ добавить лошадь', 'horse', days)),
-      h('section', { class: 'card' }, h('h2', { text: 'Маршруты' }),
-        h('p', { class: 'muted', text: 'Что видят гости в форме записи: название, подпись и время выездов. Снимите «проводится», чтобы убрать маршрут с сайта, — уже записанные заявки останутся.' }),
-        ...st.routes.map(r => routeCard(r)), addRoute),
-      h('section', { class: 'card' }, h('h2', { text: 'Ваша ссылка' }),
+        addButton('+ добавить лошадь', 'horse', days));
+      if (k === 'routes') {
+        const addRoute = h('button', { type: 'button', class: 'btn btn-quiet add', text: '+ добавить маршрут' });
+        addRoute.addEventListener('click', () => {
+          addRoute.before(routeCard({ key: null, name: '', duration_min: 60, slots: [], dur_label: '', note: '', active: true }, true));
+          addRoute.previousElementSibling.querySelector('input').focus();
+        });
+        return h('section', { class: 'card' }, h('h2', { text: 'Маршруты' }),
+          h('p', { class: 'muted', text: 'Что видят гости в форме записи: название, подпись и время выездов. Снимите «проводится», чтобы убрать маршрут с сайта, — уже записанные заявки останутся.' }),
+          ...st.routes.map(r => routeCard(r)), addRoute);
+      }
+      return h('section', { class: 'card' }, h('h2', { text: 'Ваша ссылка' }),
         h('p', { class: 'muted', text: 'Если телефон потерялся или ссылка попала к чужому, выдайте себе новую — старая перестанет работать.' }),
-        linkBox({ role: 'head' })));
+        linkBox({ role: 'head' }));
+    }
+    main.replaceChildren(seg, body);
+    show();
   }
 
   // Карточка маршрута: название, длительность, подписи для сайта, время выездов, «проводится».
