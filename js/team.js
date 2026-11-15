@@ -83,7 +83,7 @@
     }
     $('#who').textContent = st.me.role === 'head' ? 'Главный' : (st.me.name || 'Инструктор');
     const tabs = st.me.role === 'head'
-      ? [['schedule', 'Расписание'], ['team', 'Команда и лошади']]
+      ? [['schedule', 'Расписание'], ['team', 'Команда и лошади'], ['history', 'История']]
       : [['mine', 'Мои выезды'], ['schedule', 'Расписание'], ['record', 'Записать гостя']];
     tabsNav.replaceChildren(...tabs.map(([k, t]) => h('button', { type: 'button', 'data-tab': k, text: t, onclick: () => go(k) })));
     tabsNav.hidden = false;
@@ -91,7 +91,7 @@
     if (st.openId) { const id = st.openId; st.openId = null; openRequest(id); }
   }
 
-  async function go(tab) {
+  async function go(tab, arg) {
     st.tab = tab;
     for (const b of tabsNav.children) b.setAttribute('aria-current', String(b.dataset.tab === tab));
     main.replaceChildren(h('p', { class: 'state', text: 'Загружаем…' }));
@@ -100,6 +100,7 @@
       else if (tab === 'team') await viewTeam();
       else if (tab === 'mine') await viewMine();
       else if (tab === 'record') await viewRecord();
+      else if (tab === 'history') await viewHistory(arg);
     } catch (e) {
       if (e.code === '42501' && /forbidden/.test(e.message)) return screen('Ссылка больше не работает', 'Попросите новую у главного.');
       main.replaceChildren(h('p', { class: 'state err', text: errText(e) }),
@@ -148,37 +149,63 @@
       h('span', { class: 'req-tag', text: r.source === 'instructor' ? 'от инструктора' : STATUS[r.status] })));
   }
 
-  // Сетка: строки — время выезда всех маршрутов, столбцы — инструкторы (плюс «без инструктора» для ждущих).
+  // Сетка-шкала: по вертикали время, каждый выезд — блок длиной в свой маршрут
+  // (дальний 08:00–15:00 тянется на семь часов). Столбцы — инструкторы и «Ждут».
+  const PX = 1.1;   // пикселей на минуту: час = 66 px
   function grid(day) {
-    const times = [...new Set(day.routes.flatMap(r => r.slots))].sort();
+    const listed = new Set(day.instructors.map(i => i.id));
     const cols = [{ id: null, name: 'Ждут', day_off: false }, ...day.instructors];
     const span = r => [mins(r.start_time), mins(r.start_time) + routeDur(r.route_key)];
     // В «Ждут» — заявки без инструктора и выезды, чьих инструкторов нет среди столбцов (например, отключили).
-    const listed = new Set(day.instructors.map(i => i.id));
     const at = col => day.requests.filter(r =>
       col.id ? r.instructors.some(i => i.id === col.id) : !r.instructors.some(i => listed.has(i.id)));
+    const ranges = [...day.routes.flatMap(r => r.slots.map(t => [mins(t), mins(t) + r.duration_min])), ...day.requests.map(span)];
+    const from = Math.floor(Math.min(...ranges.map(x => x[0])) / 60) * 60;
+    const to = Math.ceil(Math.max(...ranges.map(x => x[1])) / 60) * 60;
+    const height = (to - from) * PX;
+    const hours = []; for (let m = from; m < to; m += 60) hours.push(m);
 
-    const head = h('tr', null, h('th', { scope: 'col', class: 'tcol', text: 'Время' }),
-      ...cols.map(c => h('th', { scope: 'col', class: c.day_off ? 'off' : null }, c.name, c.day_off ? h('small', { text: 'выходной' }) : null)));
-    const rows = times.map(t => h('tr', null, h('th', { scope: 'row', class: 'tcol', text: t }), ...cols.map(c => {
-      const td = h('td', { class: c.day_off ? 'off' : null });
-      for (const r of at(c)) {
-        const [s, e] = span(r);
-        if (r.start_time === t) {
-          td.append(h('button', { type: 'button', class: `cell ${r.status}`, onclick: () => openRequest(r.id) },
-            h('b', { text: r.guest_name }), h('span', { text: `${people(r.people)}, ${routeName(r.route_key)}` }),
-            routeDur(r.route_key) > 90 ? h('span', { text: `до ${hhmm(e)}` }) : null));
-        } else if (mins(t) > s && mins(t) < e && c.id) {
-          td.classList.add('busy'); td.title = `Занят: ${r.guest_name}`;
-        }
+    const axis = h('div', { class: 'tl-axis', style: `height:${height}px` },
+      ...hours.map(m => h('span', { style: `top:${(m - from) * PX}px`, text: hhmm(m) })));
+    const nowLine = () => {
+      if (st.day !== today()) return null;
+      const n = new Date(), m = n.getHours() * 60 + n.getMinutes();
+      return m >= from && m <= to ? h('i', { class: 'tl-now', style: `top:${(m - from) * PX}px`, 'aria-hidden': 'true' }) : null;
+    };
+    const widths = [];   // столбец шире, если в нём несколько заявок рядом
+    const columns = cols.map(c => {
+      const list = at(c).map(r => { const [a, b] = span(r); return { r, a, b }; }).sort((x, y) => x.a - y.a || x.b - y.b);
+      const lanes = [];   // пересекающиеся заявки в одном столбце встают рядом
+      for (const it of list) {
+        let i = lanes.findIndex(end => end <= it.a);
+        if (i < 0) { i = lanes.length; lanes.push(0); }
+        lanes[i] = it.b; it.lane = i;
       }
-      return td;
-    })));
-    const wrap = h('div', { class: 'grid-wrap', tabindex: '0', 'aria-label': `Расписание на ${dayLabel(day.day)}` },
-      h('table', { class: 'grid' }, h('thead', null, head), h('tbody', null, ...rows)));
+      const n = Math.max(1, lanes.length);
+      widths.push(`minmax(${n * 116}px, ${n}fr)`);
+      const blocks = list.map(({ r, a, b, lane }) => {
+        const dur = b - a, many = r.instructors.length > 1;
+        return h('button', {
+          type: 'button', class: `tl-ride ${r.status}${dur <= 60 ? ' short' : ''}`,
+          style: `top:${(a - from) * PX + 1}px;height:${dur * PX - 3}px;left:calc(${lane * 100 / n}% + 3px);width:calc(${100 / n}% - 6px)`,
+          'aria-label': `${r.start_time}–${hhmm(b)}, ${r.guest_name}, ${people(r.people)}, ${routeName(r.route_key)}, ${STATUS[r.status]}${many ? ', инструкторов: ' + r.instructors.length : ''}`,
+          onclick: () => openRequest(r.id),
+        },
+          h('span', { class: 'tl-time', text: `${r.start_time}–${hhmm(b)}` }),
+          h('b', { text: r.guest_name }),
+          h('span', { text: `${people(r.people)} · ${routeName(r.route_key)}` }),
+          many ? h('span', { class: 'tl-team', text: `вместе: ${r.instructors.map(i => i.name).join(', ')}` }) : null);
+      });
+      return h('div', { class: 'tl-colwrap' },
+        h('div', { class: 'tl-head' + (c.day_off ? ' off' : '') }, h('span', { text: c.name }), c.day_off ? h('small', { text: 'выходной' }) : null),
+        h('div', { class: 'tl-col' + (c.day_off ? ' off' : ''), style: `height:${height}px` }, nowLine(), ...blocks));
+    });
+    const tl = h('div', { class: 'tl', style: `grid-template-columns:52px ${widths.join(' ')}` },
+      h('div', { class: 'tl-colwrap tl-axiswrap' }, h('div', { class: 'tl-head', text: 'Время' }), axis), ...columns);
+    const wrap = h('div', { class: 'grid-wrap', tabindex: '0', 'aria-label': `Расписание на ${dayLabel(day.day)}` }, tl);
     return h('section', { class: 'card grid-card' }, wrap,
-      h('p', { class: 'legend' }, h('span', { class: 'dot pending' }), 'ждёт ', h('span', { class: 'dot confirmed' }), 'подтверждено ',
-        h('span', { class: 'dot busy' }), 'занят в пути'));
+      h('p', { class: 'legend' }, h('span', { class: 'dot pending' }), 'ждёт ', h('span', { class: 'dot confirmed' }), 'подтверждено',
+        st.day === today() ? h('span', { class: 'dot now' }) : null, st.day === today() ? 'сейчас' : null));
   }
 
   // ---------- заявка (нижний лист) ----------
@@ -210,15 +237,66 @@
         h('a', { class: 'wa', href: S.waLink(r.guest_phone, `Здравствуйте, ${r.guest_name}!`), target: '_blank', rel: 'noopener', 'aria-label': 'Написать в WhatsApp' }, icon('wa')))) : null,
       r.experience ? fact('Опыт', r.experience) : null,
       fact('Откуда', r.source === 'instructor' ? 'записал инструктор' : 'с сайта'),
-      r.instructors.length ? fact('Инструктор', r.instructors.map(i => i.name).join(', ')) : null,
+      r.instructors.length ? fact(r.instructors.length > 1 ? 'Инструкторы' : 'Инструктор', r.instructors.map(i => i.name).join(', ')) : null,
       r.horses_count ? fact('Лошадей', String(r.horses_count)) : null);
     const status = h('p', { class: `status ${r.status}`, text: STATUS[r.status] });
     const parts = [sheetHead(`${r.start_time}, ${r.guest_name}`), status, info];
     if (isHead && r.status !== 'rejected' && opt) parts.push(headActions(r, opt));
     if (isHead && r.status === 'rejected') parts.push(notify(r, 'reject'));
+    if (r.history && r.history.length) parts.push(historyBlock(r.history));
     sheetBody.replaceChildren(...parts);
   }
   const fact = (k, v) => h('div', null, h('dt', { text: k }), h('dd', null, v));
+
+  // ---------- история ----------
+  const shortDay = s => { const d = parse(s); return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`; };
+  const stamp = at => { const d = new Date(at); return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${hhmm(d.getHours() * 60 + d.getMinutes())}`; };
+  const clock = at => { const d = new Date(at); return hhmm(d.getHours() * 60 + d.getMinutes()); };
+  function eventText(e) {
+    const d = e.details || {};
+    const team = () => `инструкторы: ${(d.instructors || []).join(', ') || '—'}, лошадей: ${d.horses}`;
+    switch (e.action) {
+      case 'created': return e.actor_role === 'site' ? 'Заявка с сайта' : e.actor_role === 'head' ? 'Записал главный' : `Записал(а) ${e.actor_name}`;
+      case 'confirmed': return `Подтверждено — ${team()}`;
+      case 'updated': return `Изменено — ${team()}`;
+      case 'moved': return `Перенесено: ${shortDay(d.from_day)}, ${d.from_time} → ${shortDay(d.to_day)}, ${d.to_time}` + (d.dropped ? '. Подтверждение снято' : '');
+      case 'rejected': return 'Отклонено';
+      default: return e.action;
+    }
+  }
+  function historyBlock(list) {
+    return h('details', { class: 'history' }, h('summary', { text: `История заявки (${list.length})` }),
+      h('ol', { class: 'events' }, ...list.map(e => h('li', null,
+        h('span', { class: 'ev-at', text: stamp(e.at) }),
+        h('span', { class: `ev-what ${e.action}`, text: eventText(e) }),
+        e.actor_role === 'instructor' && e.action !== 'created' ? h('span', { class: 'ev-who', text: e.actor_name }) : null))));
+  }
+
+  // Вкладка «История» у главного: что происходило с заявками, по дням, новые сверху.
+  async function viewHistory(days) {
+    days = days || 7;
+    const list = await call('head_history', { p_from: addDays(today(), -(days - 1)), p_to: today() });
+    if (!st.routes.length) st.routes = (await call('team_day', { p_day: today() })).routes;
+    const groups = new Map();
+    for (const e of list) { const k = iso(new Date(e.at)); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
+    const more = h('button', { type: 'button', class: 'btn btn-quiet', text: 'Показать ещё неделю', onclick: () => go('history', days + 7) });
+    if (!list.length) {
+      main.replaceChildren(h('section', { class: 'card' }, h('h2', { text: 'История' }),
+        h('p', { class: 'muted', text: `За последние ${days} дн. изменений не было. Здесь появится всё, что происходит с заявками: кто записал, подтвердил, перенёс или отклонил.` }), more));
+      return;
+    }
+    main.replaceChildren(
+      h('p', { class: 'muted', text: 'Что происходило с заявками. Нажмите на запись, чтобы открыть заявку.' }),
+      ...[...groups].map(([d, evs]) => h('section', { class: 'card' },
+        h('h2', { text: d === today() ? 'Сегодня' : d === addDays(today(), -1) ? 'Вчера' : dayLabel(d) }),
+        h('ul', { class: 'feed' }, ...evs.map(e => h('li', null, h('button', { type: 'button', class: 'feed-item', onclick: () => openRequest(e.request_id) },
+          h('span', { class: 'ev-at', text: clock(e.at) }),
+          h('span', { class: 'feed-main' },
+            h('span', { class: `ev-what ${e.action}`, text: eventText(e) }),
+            h('span', { class: 'muted', text: `${e.guest_name}, ${people(e.people)} · ${shortDay(e.day)}, ${e.start_time} · ${routeName(e.route_key)}` }),
+            e.actor_role === 'instructor' && e.action !== 'created' ? h('span', { class: 'muted', text: e.actor_name }) : null))))))),
+      more);
+  }
 
   function headActions(r, opt) {
     const need = Math.ceil(r.people / 5);
@@ -239,6 +317,7 @@
     confirmBtn.addEventListener('click', async () => {
       const ids = boxes.map(b => b.querySelector('input')).filter(i => i.checked).map(i => i.value);
       if (ids.length * 5 < r.people) return fail({ message: `Для ${people(r.people)} нужно инструкторов: ${need}.` });
+      if (ids.length > opt.free_instructors) return fail({ message: `В это время можно взять инструкторов: ${opt.free_instructors}. Остальные нужны для ждущих заявок в то же время — сначала подтвердите или отклоните их.` });
       busy(confirmBtn, true);
       try {
         await call('head_confirm', { p_id: r.id, p_instructors: ids, p_horses: Number(horses.value) });
@@ -266,7 +345,10 @@
     const moveBtn = h('button', { type: 'button', class: 'btn btn-quiet', text: 'Перенести', onclick: () => { moveBox.hidden = !moveBox.hidden; } });
 
     return h('div', { class: 'actions' },
-      h('fieldset', null, h('legend', { text: `Инструкторы (нужно ${need})` }), h('div', { class: 'checks' }, ...boxes)),
+      h('fieldset', null, h('legend', { text: 'Инструкторы' }),
+        h('p', { class: 'muted', text: `Можно отметить нескольких: для ${people(r.people)} нужно не меньше ${need}` +
+          (opt.free_instructors < list.filter(i => !i.busy && !i.day_off).length ? `, взять сейчас можно до ${opt.free_instructors} — остальные держат ждущие заявки в это же время.` : '.') }),
+        h('div', { class: 'checks' }, ...boxes)),
       h('label', { class: 'field' }, h('span', { text: 'Лошадей' }), horses, h('small', { id: 'horses-hint', text: `свободно в это время: ${opt.free_horses}` })),
       err,
       h('div', { class: 'btn-row' }, confirmBtn),
