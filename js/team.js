@@ -554,12 +554,13 @@
 
     async function save() {
       if (!name.value.trim()) { msg.textContent = 'Укажите имя'; return; }
+      const tel = isI && S.phoneDigits(phone.value).length > 1 ? S.phoneDigits(phone.value) : '';
       msg.textContent = 'Сохраняем…';
       try {
         p.id = await call(isI ? 'head_save_instructor' : 'head_save_horse', isI
-          ? { p_id: p.id, p_name: name.value, p_phone: phone.value, p_active: active.checked }
+          ? { p_id: p.id, p_name: name.value, p_phone: tel, p_active: active.checked }
           : { p_id: p.id, p_name: name.value, p_active: active.checked });
-        p.phone = isI ? phone.value.replace(/\D/g, '') : null;
+        p.phone = isI ? tel : null;
         p.active = active.checked;
         msg.textContent = 'Сохранено';
         card.classList.toggle('inactive', !active.checked);
@@ -570,7 +571,7 @@
       }
     }
     name.addEventListener('change', save);
-    if (phone) phone.addEventListener('change', save);
+    if (phone) { S.phoneMask(phone); phone.addEventListener('change', save); }
     active.addEventListener('change', save);
 
     const strip = h('div', { class: 'strip', hidden: !p.id, role: 'group', 'aria-label': isI ? 'Выходные' : 'Дни отдыха' }, ...days.map(d => {
@@ -666,6 +667,7 @@
     const slots = h('div', { class: 'slots', role: 'group', 'aria-label': 'Время выезда' });
     const name = h('input', { autocomplete: 'off', placeholder: 'Как зовут гостя' });
     const phone = h('input', { type: 'tel', inputmode: 'tel', placeholder: '+7 9__ ___-__-__' });
+    S.phoneMask(phone);
     const exp = h('select', null, ...EXP.map(t => h('option', { text: t })));
     const chan = h('select', null, ...CHANNELS.map(t => h('option', { text: t })));
     const err = h('p', { class: 'err', role: 'alert', hidden: true });
@@ -700,7 +702,7 @@
       err, send);
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      const problem = !f.time ? 'Выберите время выезда.' : !name.value.trim() ? 'Напишите имя гостя.' : phone.value.replace(/\D/g, '').length < 10 ? 'Проверьте телефон: нужно не меньше 10 цифр.' : '';
+      const problem = !f.time ? 'Выберите время выезда.' : !name.value.trim() ? 'Напишите имя гостя.' : S.phoneDigits(phone.value).length < 11 ? 'Проверьте телефон: после +7 нужно 10 цифр.' : '';
       if (problem) { err.textContent = problem; err.hidden = false; return; }
       err.hidden = true; busy(send, true);
       try {

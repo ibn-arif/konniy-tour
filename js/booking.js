@@ -180,14 +180,16 @@ function init() {
     if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
   });
 
+  if (window.KTSlots) KTSlots.phoneMask(form.elements.phone);
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (form.dataset.busy) return;
     const err = $('#form-error');
     const name = form.elements.name.value.trim();
-    const phone = form.elements.phone.value.replace(/\D/g, '');
+    const phone = window.KTSlots ? KTSlots.phoneDigits(form.elements.phone.value) : form.elements.phone.value.replace(/\D/g, '');
     const problem = !state.date ? 'Выберите день прогулки.' : !state.time ? 'Выберите время выезда.'
-      : !name ? 'Напишите, как к вам обращаться.' : phone.length < 10 ? 'Проверьте номер телефона: в нём должно быть не меньше 10 цифр.' : '';
+      : !name ? 'Напишите, как к вам обращаться.' : phone.length < (window.KTSlots ? 11 : 10) ? 'Проверьте номер: после +7 нужно 10 цифр.' : '';
     if (problem) { err.textContent = problem; err.hidden = false; return; }
     err.hidden = true;
     const msg = link => {

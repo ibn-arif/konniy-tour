@@ -43,3 +43,20 @@ test('waRejectText and waMoveText mention the date', () => {
 test('waLink builds a wa.me link with encoded text', () => {
   assert.equal(S.waLink('79990000000', 'а б'), 'https://wa.me/79990000000?text=%D0%B0%20%D0%B1');
 });
+
+test('formatPhone always starts with +7 and formats the rest', () => {
+  assert.equal(S.formatPhone(''), '+7 ');
+  assert.equal(S.formatPhone('+7 '), '+7 ');
+  assert.equal(S.formatPhone('+7 9'), '+7 9');
+  assert.equal(S.formatPhone('+7 9990000'), '+7 999 000-0');
+  assert.equal(S.formatPhone('+7 99900000001234'), '+7 999 000-00-00');
+  assert.equal(S.formatPhone('89990000001'), '+7 999 000-00-01');      // pasted with 8
+  assert.equal(S.formatPhone('+7 (999) 000-00-01'), '+7 999 000-00-01');
+  assert.equal(S.formatPhone('9990000001'), '+7 999 000-00-01');       // typed without prefix
+  assert.equal(S.formatPhone('+'), '+7 ');                              // tried to erase the prefix
+});
+
+test('phoneDigits returns 7XXXXXXXXXX or less', () => {
+  assert.equal(S.phoneDigits('+7 999 000-00-01'), '79990000001');
+  assert.equal(S.phoneDigits('+7 999'), '7999');
+});
