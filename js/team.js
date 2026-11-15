@@ -395,8 +395,14 @@
   // ---------- команда и лошади ----------
   async function viewTeam() {
     const to = addDays(today(), 29);
-    const data = await call('head_team', { p_from: today(), p_to: to });
+    const [data, day] = await Promise.all([call('head_team', { p_from: today(), p_to: to }), call('team_day', { p_day: today() })]);
+    st.routes = day.routes;
     const days = Array.from({ length: 30 }, (_, i) => addDays(today(), i));
+    const addRoute = h('button', { type: 'button', class: 'btn btn-quiet add', text: '+ добавить маршрут' });
+    addRoute.addEventListener('click', () => {
+      addRoute.before(routeCard({ key: null, name: '', duration_min: 60, slots: [], dur_label: '', note: '', active: true }, true));
+      addRoute.previousElementSibling.querySelector('input').focus();
+    });
     main.replaceChildren(
       h('section', { class: 'card' }, h('h2', { text: 'Инструкторы' }),
         h('p', { class: 'muted', text: 'Нажмите на день, чтобы отметить выходной. Выходные дни не предлагаются гостям на сайте.' }),
@@ -406,9 +412,55 @@
         h('p', { class: 'muted', text: 'Отмеченные дни — отдых. Лошадь «не работает» не считается совсем.' }),
         ...data.horses.map(x => personCard(x, 'horse', days)),
         addButton('+ добавить лошадь', 'horse', days)),
+      h('section', { class: 'card' }, h('h2', { text: 'Маршруты' }),
+        h('p', { class: 'muted', text: 'Что видят гости в форме записи: название, подпись и время выездов. Снимите «проводится», чтобы убрать маршрут с сайта, — уже записанные заявки останутся.' }),
+        ...st.routes.map(r => routeCard(r)), addRoute),
       h('section', { class: 'card' }, h('h2', { text: 'Ваша ссылка' }),
         h('p', { class: 'muted', text: 'Если телефон потерялся или ссылка попала к чужому, выдайте себе новую — старая перестанет работать.' }),
         linkBox({ role: 'head' })));
+  }
+
+  // Карточка маршрута: название, длительность, подписи для сайта, время выездов, «проводится».
+  const DURS = [30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 420, 480, 600, 720];
+  const durText = m => m % 60 === 0 ? `${m / 60} ч` : m < 60 ? `${m} мин` : `${Math.floor(m / 60)} ч ${m % 60} мин`;
+  function routeCard(r, fresh) {
+    const times = [...r.slots];
+    const name = h('input', { value: r.name, placeholder: 'Название маршрута', 'aria-label': 'Название маршрута', autocomplete: 'off' });
+    const dur = h('select', { 'aria-label': 'Длительность' },
+      ...[...new Set([...DURS, r.duration_min])].sort((a, b) => a - b).map(m => h('option', { value: String(m), selected: m === r.duration_min, text: durText(m) })));
+    const durLabel = h('input', { value: r.dur_label || '', placeholder: 'например, 45–60 мин' });
+    const note = h('input', { value: r.note || '', placeholder: 'например, 3,5 км, 45–60 мин' });
+    const active = h('input', { type: 'checkbox', checked: r.active });
+    const chips = h('div', { class: 'chips', role: 'list', 'aria-label': 'Время выездов' });
+    const drawChips = () => chips.replaceChildren(...(times.length ? times.sort().map(t => h('span', { class: 'chip-t', role: 'listitem' }, t,
+      h('button', { type: 'button', 'aria-label': `Убрать ${t}`, text: '×', onclick: () => { times.splice(times.indexOf(t), 1); drawChips(); } }))) : [h('span', { class: 'muted', text: 'Времени пока нет — добавьте ниже.' })]));
+    drawChips();
+    const newTime = h('input', { type: 'time', step: '900', 'aria-label': 'Новое время выезда' });
+    const addTime = h('button', { type: 'button', class: 'btn btn-quiet', text: 'Добавить время' });
+    addTime.addEventListener('click', () => { const t = newTime.value; if (t && !times.includes(t)) { times.push(t); drawChips(); } newTime.value = ''; });
+    const msg = h('p', { class: 'saved', 'aria-live': 'polite', text: fresh ? 'Заполните и нажмите «Сохранить маршрут».' : '' });
+    const save = h('button', { type: 'button', class: 'btn btn-main', text: 'Сохранить маршрут' });
+    save.addEventListener('click', async () => {
+      busy(save, true); msg.textContent = 'Сохраняем…';
+      try {
+        r.key = await call('head_save_route', { p_route: r.key, p_name: name.value, p_duration: Number(dur.value), p_slots: times,
+          p_dur_label: durLabel.value, p_note: note.value, p_active: active.checked });
+        st.routes = (await call('team_day', { p_day: today() })).routes;
+        msg.textContent = active.checked ? 'Сохранено. На сайте уже новое.' : 'Сохранено. Маршрут убран с сайта.';
+        card.classList.toggle('inactive', !active.checked);
+      } catch (e) { msg.textContent = errText(e); }
+      busy(save, false);
+    });
+    const card = h('div', { class: 'person route' + (r.active ? '' : ' inactive') },
+      h('div', { class: 'person-top' }, name, h('label', { class: 'toggle' }, active, h('span', { text: 'проводится' }))),
+      h('div', { class: 'two-col' },
+        h('label', { class: 'field' }, h('span', { text: 'Длится' }), dur),
+        h('label', { class: 'field' }, h('span', { text: 'Как писать на сайте' }), durLabel)),
+      h('label', { class: 'field' }, h('span', { text: 'Подпись в форме записи' }), note),
+      h('div', { class: 'field' }, h('span', { text: 'Время выездов' }), chips,
+        h('div', { class: 'add-time' }, newTime, addTime)),
+      save, msg);
+    return card;
   }
 
   function addButton(text, kind, days) {
@@ -533,8 +585,9 @@
   // ---------- инструктор: записать гостя ----------
   async function viewRecord() {
     if (!st.routes.length) st.routes = (await call('team_day', { p_day: today() })).routes;
-    const f = { route: st.routes[0].key, day: today(), people: 1, time: null };
-    const routes = h('div', { class: 'pick' }, ...st.routes.map((r, i) => h('label', null,
+    const open = st.routes.filter(r => r.active !== false);
+    const f = { route: open[0].key, day: today(), people: 1, time: null };
+    const routes = h('div', { class: 'pick' }, ...open.map((r, i) => h('label', null,
       h('input', { type: 'radio', name: 'route', value: r.key, checked: i === 0, onchange: () => { f.route = r.key; load(); } }), h('span', { text: r.name }))));
     const day = h('input', { type: 'date', value: f.day, min: today(), max: addDays(today(), 60), onchange: e => { f.day = e.target.value; load(); } });
     const ppl = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '10', value: '1', onchange: e => { f.people = Math.min(10, Math.max(1, Number(e.target.value) || 1)); e.target.value = f.people; load(); } });

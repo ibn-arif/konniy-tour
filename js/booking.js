@@ -52,6 +52,28 @@ function init() {
       live.on = false; redraw();     // база не ответила — время из CONFIG
     }
   }
+  // Маршруты из базы: новые, добавленные главным, появляются в форме сами.
+  // Если база не ответила — остаются три маршрута из разметки страницы.
+  async function loadRoutes() {
+    if (!live.on) return;
+    try {
+      const rs = await KTApi.rpc('public_routes', {});
+      if (!Array.isArray(rs) || !rs.length) return;
+      const pick = route().closest('.pick');
+      const was = route().value;
+      pick.replaceChildren(...rs.map(r => {
+        const input = Object.assign(document.createElement('input'), { type: 'radio', name: 'route', value: r.key });
+        input.dataset.name = r.name;
+        input.dataset.dur = r.dur_label;
+        const label = document.createElement('label');
+        label.append(input, Object.assign(document.createElement('b'), { textContent: r.name }));
+        if (r.note) label.append(Object.assign(document.createElement('small'), { textContent: r.note }));
+        return label;
+      }));
+      (pick.querySelector(`input[value="${CSS.escape(was)}"]`) || pick.querySelector('input')).checked = true;
+      for (const r of rs) CONFIG.slots[r.key] = r.slots;
+    } catch (e) { /* остаются маршруты из разметки */ }
+  }
   function redraw() {
     if (state.date && dayOpen(state.date) === false) { state.date = null; state.time = null; }
     if (state.date && state.time && !slotList(state.date).some(s => s.time === state.time && s.open)) state.time = null;
@@ -205,5 +227,6 @@ function init() {
     }
   });
 
-  renderCal(); renderSlots(); people(1); loadAvail();
+  renderCal(); renderSlots(); people(1);
+  loadRoutes().then(() => { summary(); loadAvail(); });
 }
