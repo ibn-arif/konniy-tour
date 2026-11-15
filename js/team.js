@@ -10,6 +10,10 @@
   const WD_FULL = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
   const STATUS = { pending: 'ждёт', confirmed: 'подтверждено', rejected: 'отклонено' };
   const EXP = ['Ни разу не ездил(а)', 'Пару раз катался(ась)', 'Уверенно езжу'];
+  const CHANNELS = ['Звонок', 'WhatsApp', 'Instagram', 'Лично', 'Другое'];
+  // Откуда заявка: подпись в карточке и в списке.
+  const srcText = r => r.source === 'site' ? 'с сайта'
+    : (r.source === 'head' ? 'записал главный' : 'записал инструктор') + (r.channel ? ` · ${r.channel.toLowerCase()}` : '');
 
   // ---------- мелочи ----------
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -84,7 +88,7 @@
     $('#who').textContent = st.me.role === 'head' ? 'Главный' : (st.me.name || 'Инструктор');
     const isHead = st.me.role === 'head';
     const tabs = isHead
-      ? [['requests', 'Заявки'], ['schedule', 'День'], ['history', 'История'], ['team', 'Команда']]
+      ? [['requests', 'Заявки'], ['schedule', 'День'], ['record', 'Записать'], ['history', 'История'], ['team', 'Команда']]
       : [['mine', 'Мои выезды'], ['schedule', 'День'], ['record', 'Записать']];
     tabsNav.replaceChildren(...tabs.map(([k, t]) => h('button', { type: 'button', 'data-tab': k, onclick: () => go(k) },
       tabIcon(ICONS[k]), h('span', { text: t }), k === 'requests' ? h('b', { class: 'badge', hidden: true, 'aria-label': 'новых' }) : null)));
@@ -197,7 +201,7 @@
     return h('li', null, h('button', { type: 'button', class: `req ${r.status}`, onclick: () => openRequest(r.id) },
       h('span', { class: 'req-when', text: (withDay ? dayLabel(r.day).replace(/,.*/, '') + ', ' : '') + r.start_time }),
       h('span', { class: 'req-what' }, h('b', { text: r.guest_name }), ` · ${people(r.people)} · ${routeName(r.route_key)}`),
-      h('span', { class: 'req-tag', text: r.source === 'instructor' ? 'от инструктора' : STATUS[r.status] })));
+      h('span', { class: 'req-tag', text: r.status === 'pending' && r.source !== 'site' ? (r.source === 'head' ? (r.channel || 'вручную') : 'от инструктора') : STATUS[r.status] })));
   }
 
   // Сетка-шкала: по вертикали время, каждый выезд — блок длиной в свой маршрут
@@ -287,7 +291,7 @@
       r.guest_phone ? fact('Телефон', h('span', { class: 'phone' }, h('a', { href: 'tel:+' + r.guest_phone, text: phoneH(r.guest_phone) }),
         h('a', { class: 'wa', href: S.waLink(r.guest_phone, `Здравствуйте, ${r.guest_name}!`), target: '_blank', rel: 'noopener', 'aria-label': 'Написать в WhatsApp' }, icon('wa')))) : null,
       r.experience ? fact('Опыт', r.experience) : null,
-      fact('Откуда', r.source === 'instructor' ? 'записал инструктор' : 'с сайта'),
+      fact('Откуда', srcText(r)),
       r.instructors.length ? fact(r.instructors.length > 1 ? 'Инструкторы' : 'Инструктор', r.instructors.map(i => i.name).join(', ')) : null,
       r.horses_count ? fact('Лошадей', String(r.horses_count)) : null);
     const status = h('p', { class: `status ${r.status}`, text: STATUS[r.status] });
@@ -307,7 +311,8 @@
     const d = e.details || {};
     const team = () => `инструкторы: ${(d.instructors || []).join(', ') || '—'}, лошадей: ${d.horses}`;
     switch (e.action) {
-      case 'created': return e.actor_role === 'site' ? 'Заявка с сайта' : e.actor_role === 'head' ? 'Записал главный' : `Записал(а) ${e.actor_name}`;
+      case 'created': return (e.actor_role === 'site' ? 'Заявка с сайта' : e.actor_role === 'head' ? 'Записал главный' : `Записал(а) ${e.actor_name}`)
+        + (e.details && e.details.channel ? ` (${e.details.channel.toLowerCase()})` : '');
       case 'confirmed': return `Подтверждено — ${team()}`;
       case 'updated': return `Изменено — ${team()}`;
       case 'moved': return `Перенесено: ${shortDay(d.from_day)}, ${d.from_time} → ${shortDay(d.to_day)}, ${d.to_time}` + (d.dropped ? '. Подтверждение снято' : '');
@@ -648,8 +653,9 @@
         h('p', { class: `status ${r.status}`, text: STATUS[r.status] })))))));
   }
 
-  // ---------- инструктор: записать гостя ----------
+  // ---------- записать гостя (звонок, WhatsApp, лично) ----------
   async function viewRecord() {
+    const isHead = st.me.role === 'head';
     if (!st.routes.length) st.routes = (await call('team_day', { p_day: today() })).routes;
     const open = st.routes.filter(r => r.active !== false);
     const f = { route: open[0].key, day: today(), people: 1, time: null };
@@ -661,8 +667,9 @@
     const name = h('input', { autocomplete: 'off', placeholder: 'Как зовут гостя' });
     const phone = h('input', { type: 'tel', inputmode: 'tel', placeholder: '+7 9__ ___-__-__' });
     const exp = h('select', null, ...EXP.map(t => h('option', { text: t })));
+    const chan = h('select', null, ...CHANNELS.map(t => h('option', { text: t })));
     const err = h('p', { class: 'err', role: 'alert', hidden: true });
-    const send = h('button', { type: 'submit', class: 'btn btn-main', text: 'Отправить главному' });
+    const send = h('button', { type: 'submit', class: 'btn btn-main', text: isHead ? 'Записать' : 'Отправить главному' });
 
     async function load() {
       f.time = null;
@@ -680,7 +687,10 @@
 
     const form = h('form', { class: 'card record', novalidate: true },
       h('h2', { text: 'Записать гостя' }),
-      h('p', { class: 'muted', text: 'Гость позвонил вам? Запишите его — заявка уйдёт главному на подтверждение.' }),
+      h('p', { class: 'muted', text: isHead
+        ? 'Гость позвонил, написал или пришёл сам? Запишите его здесь, чтобы это время не предложили на сайте. Потом подтвердите заявку и выберите инструктора.'
+        : 'Гость позвонил вам? Запишите его — заявка уйдёт главному на подтверждение.' }),
+      h('label', { class: 'field' }, h('span', { text: 'Откуда гость' }), chan),
       h('fieldset', null, h('legend', { text: 'Маршрут' }), routes),
       h('div', { class: 'two-col' }, h('label', { class: 'field' }, h('span', { text: 'День' }), day), h('label', { class: 'field' }, h('span', { text: 'Сколько человек' }), ppl)),
       h('fieldset', null, h('legend', { text: 'Время выезда' }), slots),
@@ -694,7 +704,16 @@
       if (problem) { err.textContent = problem; err.hidden = false; return; }
       err.hidden = true; busy(send, true);
       try {
-        await call('team_create_request', { p_route: f.route, p_day: f.day, p_start: f.time, p_people: f.people, p_name: name.value, p_phone: phone.value, p_experience: exp.value });
+        const id = await call('team_create_request', { p_route: f.route, p_day: f.day, p_start: f.time, p_people: f.people, p_name: name.value, p_phone: phone.value, p_experience: exp.value, p_channel: chan.value });
+        if (isHead) {
+          main.replaceChildren(h('section', { class: 'card done' }, h('h2', { text: 'Гость записан' }),
+            h('p', { text: `${name.value.trim()}, ${people(f.people)}, ${whenLabel(f.day, f.time)}. Заявка ждёт подтверждения.` }),
+            h('button', { type: 'button', class: 'btn btn-main', text: 'Подтвердить', onclick: () => openRequest(id) }),
+            h('button', { type: 'button', class: 'btn btn-quiet', text: 'Записать ещё', onclick: () => go('record') })));
+          refreshBadge();
+          openRequest(id);
+          return;
+        }
         main.replaceChildren(h('section', { class: 'card done' }, h('h2', { text: 'Заявка отправлена главному' }),
           h('p', { text: `${name.value.trim()}, ${people(f.people)}, ${whenLabel(f.day, f.time)}. Время уже не предлагается на сайте. Когда главный подтвердит, выезд появится в «Мои выезды».` }),
           h('button', { type: 'button', class: 'btn btn-quiet', text: 'Записать ещё', onclick: () => go('record') })));
